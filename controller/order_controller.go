@@ -33,18 +33,25 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	// Saat membuat order
+	// Update status kurir jadi offline
 	if input.KurirID != 0 {
 		config.DB.Model(&model.User{}).Where("id = ?", input.KurirID).Update("status", "offline")
 	}
 
-	c.JSON(http.StatusCreated, input)
+	// ✅ Return order ID dan pesan
+	c.JSON(http.StatusCreated, gin.H{
+		"message":  "Pesanan berhasil dibuat",
+		"order_id": input.ID, // ambil ID dari input setelah di-insert
+	})
 }
 
 // 🔸 Get All Orders
 func GetAllOrders(c *gin.Context) {
 	var orders []model.Order
-	if err := config.DB.Find(&orders).Error; err != nil {
+	if err := config.DB.
+		Preload("Customer").
+		Preload("Kurir").
+		Find(&orders).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
