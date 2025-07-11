@@ -22,14 +22,18 @@ func GetAllUsers(c *gin.Context) {
 func GetAvailableKurir(c *gin.Context) {
 	var kurir []model.User
 
-	// kurir online & tidak punya order aktif
-	err := config.DB.Raw(`
-        SELECT * FROM users 
-        WHERE role = 'kurir' AND status = 'online' 
-        AND id NOT IN (
-            SELECT kurir_id FROM orders WHERE status = 'proses'
-        )
-    `).Scan(&kurir).Error
+	// Subquery: kurir_id yang sedang memproses order
+	subQuery := config.DB.
+		Model(&model.Order{}).
+		Select("kurir_id").
+		Where("status = ?", "proses")
+
+	// Main query: cari kurir yang online dan tidak ada di subquery
+	err := config.DB.
+		Model(&model.User{}).
+		Where("role = ? AND status = ?", "kurir", "online").
+		Where("id NOT IN (?)", subQuery).
+		Find(&kurir).Error
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
