@@ -26,7 +26,6 @@ func SetupRoutes(r *gin.Engine) {
 	r.GET("/kurir/track/:id", controller.GetKurirLocation)
 	r.GET("/kurir/:id/location", controller.GetKurirLocation)
 	r.GET("/kurir/available", controller.GetAvailableKurir)
-	r.GET("/users/profile", controller.GetUserProfile)
 
 	// ✅ Protected with JWT
 	auth := r.Group("/api")
@@ -48,6 +47,7 @@ func SetupRoutes(r *gin.Engine) {
 	auth.PUT("/orders/:id", controller.UpdateOrder)
 	auth.DELETE("/orders/:id", middleware.RoleMiddleware("admin"), controller.DeleteOrder)
 	auth.PUT("/orders/status", middleware.RoleMiddleware("kurir"), controller.UpdateOrderStatus)
+	auth.GET("/users/profile", controller.GetUserProfile)
 
 	// Chat via REST API (opsional)
 	auth.POST("/chat", middleware.RoleMiddleware("customer", "kurir"), controller.SendChat)
