@@ -55,6 +55,32 @@ func GetKurirByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
+func GetUserProfile(c *gin.Context) {
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	userID, ok := userIDInterface.(int)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var user model.User
+	if err := config.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User tidak ditemukan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":    user.ID,
+		"name":  user.Name,
+		"email": user.Email,
+		"role":  user.Role,
+	})
+}
 func UpdateKurirStatus(c *gin.Context) {
 	var input struct {
 		ID     uint   `json:"id"`     // sementara kita pakai ID dari body
