@@ -202,25 +202,32 @@ func GetOrdersForKurir(c *gin.Context) {
 	kurirID := c.Param("id")
 	var orders []model.Order
 
-	// JOIN dengan tabel users (customer)
-	if err := config.DB.
-		Preload("Customer").
-		Where("kurir_id = ? AND status = ?", kurirID, "proses").
-		Find(&orders).Error; err != nil {
+	if err := config.DB.Preload("Customer"). // untuk ambil nama customer
+							Where("kurir_id = ? AND status = ?", kurirID, "proses").
+							Find(&orders).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal ambil data order"})
 		return
 	}
 
-	// ubah bentuk responsenya jadi include nama_customer
+	// 🔄 Format response yang lengkap
 	var response []map[string]interface{}
 	for _, order := range orders {
+		// Ambil nama_order tergantung layanannya
+		var namaOrder string
+		if order.Layanan == "barang" && order.NamaBarang != nil {
+			namaOrder = *order.NamaBarang
+		} else if order.Layanan == "makanan" && order.NamaMakanan != nil {
+			namaOrder = *order.NamaMakanan
+		}
+
 		response = append(response, map[string]interface{}{
 			"id":            order.ID,
 			"layanan":       order.Layanan,
 			"status":        order.Status,
 			"alamat_jemput": order.AlamatJemput,
 			"alamat_antar":  order.AlamatAntar,
-			"nama_customer": order.Customer.Name,
+			"nama_order":    namaOrder,           // ✅ ini nama barang/makanan
+			"nama_customer": order.Customer.Name, // ✅ ini nama customer
 		})
 	}
 
