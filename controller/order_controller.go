@@ -176,6 +176,27 @@ func GetChat(c *gin.Context) {
 	})
 }
 
+func UpdateOrderStatus(c *gin.Context) {
+	var input struct {
+		ID     uint   `json:"id"`
+		Status string `json:"status"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Input tidak valid"})
+		return
+	}
+
+	if err := config.DB.Model(&model.Order{}).
+		Where("id = ?", input.ID).
+		Update("status", input.Status).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal update status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Status berhasil diperbarui"})
+}
+
 // 🔹 GET /kurir/:id/orders
 func GetOrdersForKurir(c *gin.Context) {
 	kurirID := c.Param("id")
