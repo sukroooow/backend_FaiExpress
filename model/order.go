@@ -17,6 +17,10 @@ type Order struct {
 	AlamatAntar  string         `json:"alamat_antar"`
 	NamaBarang   *string        `json:"nama_barang"`
 	NamaMakanan  *string        `json:"nama_makanan"`
+	LatJemput    float64        `json:"lat_jemput"`
+	LngJemput    float64        `json:"lng_jemput"`
+	LatAntar     float64        `json:"lat_antar"`
+	LngAntar     float64        `json:"lng_antar"`
 	Status       string         `json:"status"`
 	Layanan      string         `json:"layanan"`
 	CreatedAt    time.Time      `json:"created_at"`
