@@ -43,6 +43,18 @@ func GetAvailableKurir(c *gin.Context) {
 	c.JSON(http.StatusOK, kurir)
 }
 
+func GetKurirByID(c *gin.Context) {
+	idParam := c.Param("id")
+
+	var user model.User
+	if err := config.DB.Where("id = ? AND role = ?", idParam, "kurir").First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Kurir tidak ditemukan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
 func UpdateKurirStatus(c *gin.Context) {
 	var input struct {
 		ID     uint   `json:"id"`     // sementara kita pakai ID dari body

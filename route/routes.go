@@ -35,6 +35,7 @@ func SetupRoutes(r *gin.Engine) {
 	auth.GET("/kurir/:id/orders", middleware.RoleMiddleware("kurir"), controller.GetOrdersForKurir)
 	auth.PUT("/kurir/status", middleware.RoleMiddleware("kurir"), controller.UpdateKurirStatus)
 	auth.PUT("/kurir/location", middleware.RoleMiddleware("kurir"), controller.UpdateLocation)
+	auth.GET("/kurir/:id", middleware.RoleMiddleware("kurir"), controller.GetKurirByID)
 
 	// Customer - Orders
 	auth.POST("/orders", middleware.RoleMiddleware("customer"), controller.CreateOrder)
