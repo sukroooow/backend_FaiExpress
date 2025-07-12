@@ -181,10 +181,27 @@ func GetOrdersForKurir(c *gin.Context) {
 	kurirID := c.Param("id")
 	var orders []model.Order
 
-	if err := config.DB.Where("kurir_id = ? AND status = ?", kurirID, "proses").Find(&orders).Error; err != nil {
+	// JOIN dengan tabel users (customer)
+	if err := config.DB.
+		Preload("Customer").
+		Where("kurir_id = ? AND status = ?", kurirID, "proses").
+		Find(&orders).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal ambil data order"})
 		return
 	}
 
-	c.JSON(http.StatusOK, orders)
+	// ubah bentuk responsenya jadi include nama_customer
+	var response []map[string]interface{}
+	for _, order := range orders {
+		response = append(response, map[string]interface{}{
+			"id":            order.ID,
+			"layanan":       order.Layanan,
+			"status":        order.Status,
+			"alamat_jemput": order.AlamatJemput,
+			"alamat_antar":  order.AlamatAntar,
+			"nama_customer": order.Customer.Name,
+		})
+	}
+
+	c.JSON(http.StatusOK, response)
 }
