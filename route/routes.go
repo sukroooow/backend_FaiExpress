@@ -17,6 +17,7 @@ func SetupRoutes(r *gin.Engine) {
 	r.POST("/chat/send", handlers.SendChatMessage)
 	r.GET("/centrifugo/token", handlers.GenerateCentrifugoToken)
 	r.GET("/chat/load/:order_id", handlers.GetMessagesByOrderID)
+	r.POST("/schedule/delete-chat/:id", handlers.ScheduleDeleteChat)
 
 	// ✅ Auth
 	r.POST("/register", controller.Register)
