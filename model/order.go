@@ -9,45 +9,23 @@ import (
 type Order struct {
 	ID         uint `gorm:"primaryKey" json:"id"`
 	CustomerID uint `json:"customer_id"`
-	Customer   User `gorm:"foreignKey:CustomerID" json:"customer"` // ✅ Tambahkan
-	KurirID    uint `json:"kurir_id"`
-	Kurir      User `gorm:"foreignKey:KurirID" json:"kurir"` // ✅ Tambahkan
+	Customer   User `gorm:"foreignKey:CustomerID" json:"customer"`
 
-	AlamatJemput string         `json:"alamat_jemput"`
-	AlamatAntar  string         `json:"alamat_antar"`
-	NamaBarang   *string        `json:"nama_barang"`
-	NamaMakanan  *string        `json:"nama_makanan"`
-	LatJemput    float64        `json:"lat_jemput"`
-	LngJemput    float64        `json:"lng_jemput"`
-	LatAntar     float64        `json:"lat_antar"`
-	LngAntar     float64        `json:"lng_antar"`
-	Status       string         `json:"status"`
-	Layanan      string         `json:"layanan"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+	KurirID uint `json:"kurir_id"`
+	Kurir   User `gorm:"foreignKey:KurirID" json:"kurir"`
+
+	MetodeBayar string `json:"metode_bayar"`
+
+	Status        string  `json:"status"`
+	Layanan       string  `json:"layanan"`
+	Nominal       *uint   `json:"nominal"`        // 💰 Total tagihan (opsional)
+	PaymentStatus *string `json:"payment_status"` // ⏳ "pending" atau ✅ "done"
+
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-func (Order) TableName() string {
-	return "public.orders"
-}
-
-// type Order struct {
-// 	ID uint `gorm:"primaryKey" json:"id"`
-
-// 	CustomerID uint `gorm:"column:customer_id" json:"customer_id"`
-// 	Customer   User `gorm:"foreignKey:CustomerID;references:ID" json:"customer"`
-
-// 	KurirID uint `gorm:"column:kurir_id" json:"kurir_id"`
-// 	Kurir   User `gorm:"foreignKey:KurirID;references:ID" json:"kurir"`
-
-// 	AlamatJemput string         `json:"alamat_jemput"`
-// 	AlamatAntar  string         `json:"alamat_antar"`
-// 	NamaBarang   *string        `json:"nama_barang"`
-// 	NamaMakanan  *string        `json:"nama_makanan"`
-// 	Status       string         `json:"status"`
-// 	Layanan      string         `json:"layanan"`
-// 	CreatedAt    time.Time      `json:"created_at"`
-// 	UpdatedAt    time.Time      `json:"updated_at"`
-// 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+// func (Order) TableName() string {
+// 	return "public.orders"
 // }

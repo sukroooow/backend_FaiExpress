@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mubarok-ridho/misi-paket.backend/config"
@@ -34,9 +36,9 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	// Update status kurir jadi offline
-	if input.KurirID != 0 {
-		config.DB.Model(&model.User{}).Where("id = ?", input.KurirID).Update("status", "offline")
-	}
+	// if input.KurirID != 0 {
+	// 	config.DB.Model(&model.User{}).Where("id = ?", input.KurirID).Update("status", "offline")
+	// }
 
 	// ✅ Return order ID dan pesan
 	c.JSON(http.StatusCreated, gin.H{
@@ -61,13 +63,61 @@ func GetAllOrders(c *gin.Context) {
 // 🔸 Get Order by ID
 func GetOrderByID(c *gin.Context) {
 	id := c.Param("id")
-	var order model.Order
 
-	if err := config.DB.First(&order, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Order tidak ditemukan"})
+	var order model.Order
+	if err := config.DB.
+		Preload("Kurir").
+		Preload("Customer").
+		First(&order, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Pesanan tidak ditemukan"})
 		return
 	}
-	c.JSON(http.StatusOK, order)
+
+	var activeCount int64
+	config.DB.Model(&model.Order{}).
+		Where("kurir_id = ? AND status = ?", order.KurirID, "proses").
+		Count(&activeCount)
+
+	kurirData := map[string]interface{}{
+		"id":            order.Kurir.ID,
+		"name":          order.Kurir.Name,
+		"vehicle":       order.Kurir.Kendaraan,
+		"active_orders": activeCount,
+	}
+
+	// return response dengan kurir info yang dilengkapi
+	c.JSON(http.StatusOK, gin.H{
+		"order":   order,
+		"kurir":   kurirData,
+		"user_id": order.Customer.ID, // ✅ tambahkan ini
+
+	})
+}
+
+func UpdatePaymentMethod(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		Method string `json:"metode_bayar"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	var order model.Order
+	if err := config.DB.First(&order, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	order.MetodeBayar = req.Method // ✅ langsung assign string, bukan pointer
+
+	if err := config.DB.Save(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Metode bayar diperbarui"})
 }
 
 // 🔸 Update Order
@@ -118,15 +168,18 @@ func DeleteOrder(c *gin.Context) {
 func GetMyOrders(c *gin.Context) {
 	userID := c.GetUint("userID")
 	var orders []model.Order
-	if err := config.DB.Where("customer_id = ?", userID).Find(&orders).Error; err != nil {
+
+	if err := config.DB.
+		Preload("Kurir"). // ⬅️ PENTING: preload kurir
+		Where("customer_id = ?", userID).
+		Find(&orders).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
 	c.JSON(http.StatusOK, orders)
 }
 
-// 🔸 Update Kurir Location
-// 🔸 Update Kurir Location
 func UpdateLocation(c *gin.Context) {
 	var loc struct {
 		Lat float64 `json:"lat"`
@@ -187,9 +240,14 @@ func UpdateOrderStatus(c *gin.Context) {
 		return
 	}
 
+	// Pakai struct agar UpdatedAt ikut berubah otomatis
+	updateData := model.Order{
+		Status: input.Status,
+	}
+
 	if err := config.DB.Model(&model.Order{}).
 		Where("id = ?", input.ID).
-		Update("status", input.Status).Error; err != nil {
+		Updates(updateData).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal update status"})
 		return
 	}
@@ -197,37 +255,246 @@ func UpdateOrderStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Status berhasil diperbarui"})
 }
 
-// 🔹 GET /kurir/:id/orders
-func GetOrdersForKurir(c *gin.Context) {
+func UpdateTagihan(c *gin.Context) {
+	type RincianItem struct {
+		Judul   string `json:"judul"`
+		Nominal int    `json:"nominal"`
+	}
+
+	var req struct {
+		ID      uint          `json:"id"`
+		Nominal int           `json:"nominal"`
+		Rincian []RincianItem `json:"rincian"` // diterima, tapi tidak disimpan
+	}
+
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	var order model.Order
+	if err := config.DB.First(&order, req.ID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	nominal := uint(req.Nominal)
+	status := "pending"
+
+	order.Nominal = &nominal
+	order.PaymentStatus = &status
+
+	if err := config.DB.Save(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order"})
+		return
+	}
+
+	// Cetak rincian ke log (tidak disimpan ke DB)
+	for _, item := range req.Rincian {
+		fmt.Printf("🔹 Rincian: %s = %d\n", item.Judul, item.Nominal)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Tagihan berhasil diperbarui (rincian tidak disimpan)",
+	})
+}
+
+func ValidasiPembayaran(c *gin.Context) {
+	var req struct {
+		ID uint `json:"id"`
+	}
+
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	if err := config.DB.Model(&model.Order{}).
+		Where("id = ?", req.ID).
+		Update("payment_status", "done").Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal update status pembayaran"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Pembayaran divalidasi"})
+}
+
+func GetOrdersProses(c *gin.Context) {
 	kurirID := c.Param("id")
 	var orders []model.Order
 
-	if err := config.DB.Preload("Customer"). // untuk ambil nama customer
-							Where("kurir_id = ? AND status = ?", kurirID, "proses").
-							Find(&orders).Error; err != nil {
+	if err := config.DB.Preload("Customer").
+		Where("kurir_id = ? AND status = ?", kurirID, "proses").
+		Find(&orders).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal ambil data order"})
 		return
 	}
 
-	// 🔄 Format response yang lengkap
 	var response []map[string]interface{}
 	for _, order := range orders {
-		// Ambil nama_order tergantung layanannya
-		var namaOrder string
-		if order.Layanan == "barang" && order.NamaBarang != nil {
-			namaOrder = *order.NamaBarang
-		} else if order.Layanan == "makanan" && order.NamaMakanan != nil {
-			namaOrder = *order.NamaMakanan
-		}
-
 		response = append(response, map[string]interface{}{
 			"id":            order.ID,
 			"layanan":       order.Layanan,
 			"status":        order.Status,
-			"alamat_jemput": order.AlamatJemput,
-			"alamat_antar":  order.AlamatAntar,
-			"nama_order":    namaOrder,           // ✅ ini nama barang/makanan
-			"nama_customer": order.Customer.Name, // ✅ ini nama customer
+			"nama_order":    fmt.Sprintf("Order #%d", order.ID),
+			"nama_customer": order.Customer.Name,
+			"customer_id":   order.CustomerID,
+		})
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+func GetTotalPendapatanToday(c *gin.Context) {
+	var totalPendapatan float64
+
+	// Ambil waktu sekarang
+	now := time.Now()
+	// Tentukan awal dan akhir hari
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour).Add(-time.Second)
+
+	// Hitung total biaya dari order yang statusnya selesai hari ini
+	err := config.DB.Model(&model.Order{}).
+		Where("status = ? AND updated_at BETWEEN ? AND ?", "selesai", startOfDay, endOfDay).
+		Select("COALESCE(SUM(biaya), 0)"). // pakai COALESCE supaya hasilnya 0 kalau tidak ada data
+		Scan(&totalPendapatan).Error
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghitung total pendapatan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"total_pendapatan": totalPendapatan})
+}
+
+func GetPendapatanKurirToday(c *gin.Context) {
+	kurirID := c.Param("id")
+	today := time.Now().Format("2006-01-02")
+
+	var totalPendapatan float64
+
+	err := config.DB.
+		Model(&model.Order{}).
+		Select("COALESCE(SUM(nominal), 0)").
+		Where("kurir_id = ? AND status = ? AND DATE(updated_at) = ?", kurirID, "selesai", today).
+		Scan(&totalPendapatan).Error
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data pendapatan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total_pendapatan": totalPendapatan,
+	})
+}
+
+func GetAllTotalPendapatanToday(c *gin.Context) {
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	today := time.Now().In(loc).Truncate(24 * time.Hour)
+	tomorrow := today.Add(24 * time.Hour)
+
+	var totalPendapatan float64
+
+	err := config.DB.Model(&model.Order{}).
+		Where("status = ? AND updated_at BETWEEN ? AND ?", "selesai", today, tomorrow).
+		Select("COALESCE(SUM(nominal), 0)"). // pakai nominal karena kamu pakai itu untuk tagihan kurir
+		Scan(&totalPendapatan).Error
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghitung total pendapatan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total_pendapatan": totalPendapatan,
+	})
+}
+
+func GetTotalOrdersSelesaiToday(c *gin.Context) {
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	today := time.Now().In(loc).Truncate(24 * time.Hour)
+	tomorrow := today.Add(24 * time.Hour)
+
+	var totalOrders int64
+	err := config.DB.Model(&model.Order{}).
+		Where("status = ? AND updated_at BETWEEN ? AND ?", "selesai", today, tomorrow).
+		Count(&totalOrders).Error
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghitung pesanan selesai"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total_orders_selesai": totalOrders,
+	})
+}
+
+func GetOrdersSelesaiToday(c *gin.Context) {
+	kurirID := c.Param("id")
+	var orders []model.Order
+
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	today := time.Now().In(loc).Truncate(24 * time.Hour)
+	tomorrow := today.Add(24 * time.Hour)
+
+	if err := config.DB.Preload("Customer").
+		Where("kurir_id = ? AND status = ? AND updated_at BETWEEN ? AND ?", kurirID, "selesai", today, tomorrow).
+		Find(&orders).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal ambil data order selesai hari ini"})
+		return
+	}
+
+	var response []map[string]interface{}
+	for _, order := range orders {
+		response = append(response, map[string]interface{}{
+			"id":            order.ID,
+			"layanan":       order.Layanan,
+			"status":        order.Status,
+			"nama_order":    fmt.Sprintf("Order #%d", order.ID),
+			"nama_customer": order.Customer.Name,
+		})
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+func GetOrdersForKurir(c *gin.Context) {
+	kurirID := c.Param("id")
+	var orders []model.Order
+
+	// Ambil semua pesanan kurir (proses dan selesai)
+	if err := config.DB.Preload("Customer").
+		Where("kurir_id = ?", kurirID).
+		Find(&orders).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal ambil data order"})
+		return
+	}
+
+	var response []map[string]interface{}
+	for _, order := range orders {
+		// Safe access untuk pointer
+		nominal := uint(0)
+		if order.Nominal != nil {
+			nominal = *order.Nominal
+		}
+
+		paymentStatus := "pending"
+		if order.PaymentStatus != nil {
+			paymentStatus = *order.PaymentStatus
+		}
+
+		response = append(response, map[string]interface{}{
+			"id":             order.ID,
+			"layanan":        order.Layanan,
+			"status":         order.Status,
+			"nominal":        nominal,
+			"payment_status": paymentStatus,
+			"updated_at":     order.UpdatedAt.Format("2006-01-02"),
+			"nama_order":     fmt.Sprintf("Order #%d", order.ID),
+			"nama_customer":  order.Customer.Name,
 		})
 	}
 

@@ -10,30 +10,33 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// controller/login.go
+
 func Login(c *gin.Context) {
 	var input struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Identifier string `json:"email"` // bisa email atau no_telp
+		Password   string `json:"password"`
 	}
+
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email & password wajib diisi"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Data tidak valid"})
 		return
 	}
 
-	// Cek user by email
 	var user model.User
-	if err := config.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Email tidak ditemukan"})
+	if err := config.DB.
+		Where("email = ? OR phone = ?", input.Identifier, input.Identifier).
+		First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Email atau nomor tidak ditemukan"})
 		return
 	}
 
-	// Verifikasi password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Password salah"})
 		return
 	}
 
-	// Generate token
+	// Generate token dan kirim user info
 	token, err := utils.GenerateToken(user.ID, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat token"})
@@ -41,9 +44,13 @@ func Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Login berhasil",
-		"token":   token,
-		"user":    user,
+		"token": token,
+		"user": gin.H{
+			"id":    user.ID,
+			"name":  user.Name,
+			"email": user.Email,
+			"role":  user.Role,
+		},
 	})
 }
 

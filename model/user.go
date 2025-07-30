@@ -10,24 +10,11 @@ type User struct {
 	Kendaraan        *string `json:"kendaraan,omitempty"` // nullable (hanya kurir)
 	OrdersAsCustomer []Order `gorm:"foreignKey:CustomerID" json:"orders_as_customer,omitempty"`
 	OrdersAsKurir    []Order `gorm:"foreignKey:KurirID" json:"orders_as_kurir,omitempty"`
-	Status           string  `json:"status"` // online, offline
+	Status           string  `json:"status"`     // online, offline
+	PlatNomor        *string `json:"plat_nomor"` // ⏳ "pending" atau ✅ "done"
+
 }
 
-// type User struct {
-// 	ID       uint   `gorm:"primaryKey" json:"id"`
-// 	Name     string `json:"name"`
-// 	Email    string `gorm:"unique" json:"email"`
-// 	Password string `json:"password"`
-// 	Role     string `json:"role"`
-// 	Phone    string `json:"phone"`
-// 	Status   string `json:"status"`
-
-// 	Kendaraan *string `json:"kendaraan,omitempty"`
-
-// 	OrdersAsCustomer []Order `gorm:"foreignKey:CustomerID;references:ID" json:"orders_as_customer,omitempty"`
-// 	OrdersAsKurir    []Order `gorm:"foreignKey:KurirID;references:ID" json:"orders_as_kurir,omitempty"`
+// func (User) TableName() string {
+// 	return "public.users"
 // }
-
-func (User) TableName() string {
-	return "public.users"
-}

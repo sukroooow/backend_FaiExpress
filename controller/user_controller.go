@@ -20,51 +20,113 @@ func GetAllUsers(c *gin.Context) {
 }
 
 func GetAvailableKurir(c *gin.Context) {
-	var kurir []model.User
+	var kurirs []model.User
 
-	// Subquery: kurir_id yang sedang memproses order
-	subQuery := config.DB.
-		Model(&model.Order{}).
-		Select("kurir_id").
-		Where("status = ?", "proses")
-
-	// Main query: cari kurir yang online dan tidak ada di subquery
-	err := config.DB.
-		Model(&model.User{}).
+	// Ambil semua kurir online
+	if err := config.DB.
 		Where("role = ? AND status = ?", "kurir", "online").
-		Where("id NOT IN (?)", subQuery).
-		Find(&kurir).Error
-
-	if err != nil {
+		Find(&kurirs).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, kurir)
+	var filtered []map[string]interface{}
+	for _, kurir := range kurirs {
+		var count int64
+		config.DB.
+			Model(&model.Order{}).
+			Where("kurir_id = ? AND status = ?", kurir.ID, "proses").
+			Count(&count)
+
+		if count < 5 {
+			filtered = append(filtered, map[string]interface{}{
+				"id":             kurir.ID,
+				"name":           kurir.Name,
+				"kendaraan":      kurir.Kendaraan,
+				"jumlah_pesanan": count,
+				"no_hp":          kurir.Phone,
+			})
+		}
+	}
+
+	c.JSON(http.StatusOK, filtered)
 }
 
 func GetKurirByID(c *gin.Context) {
 	idParam := c.Param("id")
 
 	var user model.User
-	if err := config.DB.Where("id = ? AND role = ?", idParam, "kurir").First(&user).Error; err != nil {
+	if err := config.DB.First(&user, "id = ? AND role = ?", idParam, "kurir").Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Kurir tidak ditemukan"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"user": user})
+	c.JSON(http.StatusOK, gin.H{
+		"user": gin.H{
+			"id":         user.ID,
+			"name":       user.Name,
+			"email":      user.Email,
+			"phone":      user.Phone,
+			"kendaraan":  user.Kendaraan,
+			"plat_nomor": user.PlatNomor, // ← tambahkan ini
+		},
+	})
+}
+
+// PUT /api/kurir/:id
+func UpdateKurirByID(c *gin.Context) {
+	idParam := c.Param("id")
+
+	var user model.User
+	if err := config.DB.First(&user, "id = ? AND role = ?", idParam, "kurir").Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Kurir tidak ditemukan"})
+		return
+	}
+
+	var input struct {
+		Name      string  `json:"name"`
+		Phone     string  `json:"phone"`
+		Kendaraan *string `json:"kendaraan"`
+		Email     string  `json:"email"`
+		PlatNomor *string `json:"plat_nomor"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Input tidak valid"})
+		return
+	}
+
+	user.Name = input.Name
+	user.Phone = input.Phone
+	user.Kendaraan = input.Kendaraan
+	user.Email = input.Email
+	user.PlatNomor = input.PlatNomor
+
+	if err := config.DB.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal update kurir"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Profil kurir berhasil diperbarui"})
 }
 
 func GetUserProfile(c *gin.Context) {
-	userIDInterface, exists := c.Get("user_id")
+	userIDInterface, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
-	userID, ok := userIDInterface.(int)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID"})
+	var userID uint
+	switch id := userIDInterface.(type) {
+	case uint:
+		userID = id
+	case int:
+		userID = uint(id)
+	case float64:
+		userID = uint(id)
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID format"})
 		return
 	}
 
@@ -78,9 +140,11 @@ func GetUserProfile(c *gin.Context) {
 		"id":    user.ID,
 		"name":  user.Name,
 		"email": user.Email,
+		"phone": user.Phone,
 		"role":  user.Role,
 	})
 }
+
 func UpdateKurirStatus(c *gin.Context) {
 	var input struct {
 		ID     uint   `json:"id"`     // sementara kita pakai ID dari body
@@ -110,6 +174,56 @@ func GetUserByID(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, user)
+}
+
+func UpdateProfile(c *gin.Context) {
+	userIDInterface, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var userID uint
+	switch id := userIDInterface.(type) {
+	case uint:
+		userID = id
+	case int:
+		userID = uint(id)
+	case float64:
+		userID = uint(id)
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID format"})
+		return
+	}
+
+	var input struct {
+		Name  string `json:"name"`
+		Phone string `json:"phone"`
+		Email string `json:"email"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Input tidak valid"})
+		return
+	}
+
+	var user model.User
+	if err := config.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User tidak ditemukan"})
+		return
+	}
+
+	// Update field
+	user.Name = input.Name
+	user.Phone = input.Phone
+	user.Email = input.Email
+
+	if err := config.DB.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal update profil"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Profil berhasil diperbarui"})
 }
 
 // PUT /users/:id
