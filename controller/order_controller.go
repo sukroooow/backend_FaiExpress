@@ -87,11 +87,23 @@ func GetOrderByID(c *gin.Context) {
 
 	// return response dengan kurir info yang dilengkapi
 	c.JSON(http.StatusOK, gin.H{
-		"order":   order,
-		"kurir":   kurirData,
-		"user_id": order.Customer.ID, // ✅ tambahkan ini
-
+		"order":          order,
+		"kurir":          kurirData,
+		"user_id":        order.Customer.ID, // ✅ tambahkan ini
+		"payment_status": order.PaymentStatus,
+		"tagihan":        order.Nominal,
 	})
+}
+
+func DeleteMessagesByOrderID(c *gin.Context) {
+	orderID := c.Param("id")
+
+	if err := config.DB.Where("order_id = ?", orderID).Delete(&model.Message{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus pesan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Semua pesan berhasil dihapus"})
 }
 
 func UpdatePaymentMethod(c *gin.Context) {
@@ -253,6 +265,25 @@ func UpdateOrderStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Status berhasil diperbarui"})
+}
+
+func CheckOrderKurirReady(c *gin.Context) {
+	orderID := c.Param("id")
+	var order model.Order
+
+	if err := config.DB.First(&order, orderID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order tidak ditemukan"})
+		return
+	}
+
+	tagihanSiap := *order.Nominal > 0
+	metodeBayarDiisi := order.MetodeBayar != ""
+
+	c.JSON(http.StatusOK, gin.H{
+		"tagihan_siap":       tagihanSiap,
+		"metode_bayar_diisi": metodeBayarDiisi,
+		"bisa_lanjut":        tagihanSiap && metodeBayarDiisi,
+	})
 }
 
 func UpdateTagihan(c *gin.Context) {

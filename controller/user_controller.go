@@ -24,7 +24,7 @@ func GetAvailableKurir(c *gin.Context) {
 
 	// Ambil semua kurir online
 	if err := config.DB.
-		Where("role = ? AND status = ?", "kurir", "online").
+		Where("role = ? AND status = ? AND status_kerja = ?", "kurir", "online", "aktif").
 		Find(&kurirs).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -69,6 +69,7 @@ func GetKurirByID(c *gin.Context) {
 			"phone":      user.Phone,
 			"kendaraan":  user.Kendaraan,
 			"plat_nomor": user.PlatNomor, // ← tambahkan ini
+			"status":     user.Status,
 		},
 	})
 }
@@ -249,7 +250,7 @@ func UpdateUser(c *gin.Context) {
 }
 
 // DELETE /users/:id
-func DeleteUser(c *gin.Context) {
+func SoftDeleteUser(c *gin.Context) {
 	id := c.Param("id")
 	userID, err := strconv.Atoi(id)
 	if err != nil {
@@ -257,10 +258,17 @@ func DeleteUser(c *gin.Context) {
 		return
 	}
 
-	if err := config.DB.Delete(&model.User{}, userID).Error; err != nil {
+	var user model.User
+	if err := config.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User tidak ditemukan"})
+		return
+	}
+
+	user.StatusKerja = "nonaktif"
+	if err := config.DB.Save(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User berhasil dihapus"})
+	c.JSON(http.StatusOK, gin.H{"message": "Kurir berhasil dinonaktifkan"})
 }

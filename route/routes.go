@@ -17,7 +17,7 @@ func SetupRoutes(r *gin.Engine) {
 	r.POST("/chat/send", handlers.SendChatMessage)
 	r.GET("/centrifugo/token", handlers.GenerateCentrifugoToken)
 	r.GET("/chat/load/:order_id", handlers.GetMessagesByOrderID)
-	r.POST("/schedule/delete-chat/:id", handlers.ScheduleDeleteChat)
+	r.GET("/orders/:id/status", controller.CheckOrderKurirReady)
 
 	// ✅ Auth
 	r.POST("/register", controller.Register)
@@ -33,6 +33,7 @@ func SetupRoutes(r *gin.Engine) {
 	r.PUT("/api/orders/payment-validasi", middleware.AuthMiddleware(), controller.ValidasiPembayaran)
 	r.PUT("/api/orders/:id/metode_bayar", middleware.AuthMiddleware(), controller.UpdatePaymentMethod)
 	r.GET("/pendapatan/total-today", controller.GetTotalPendapatanToday)
+	r.DELETE("/messages/order/:id", controller.DeleteMessagesByOrderID)
 
 	// ✅ Protected with JWT
 	auth := r.Group("/api")
@@ -42,7 +43,7 @@ func SetupRoutes(r *gin.Engine) {
 	auth.GET("/kurir/:id/orders", middleware.RoleMiddleware("kurir"), controller.GetOrdersForKurir)
 	auth.PUT("/kurir/status", middleware.RoleMiddleware("admin"), controller.UpdateKurirStatus)
 	auth.PUT("/kurir/location", middleware.RoleMiddleware("kurir"), controller.UpdateLocation)
-	auth.GET("/kurir/:id", middleware.RoleMiddleware("kurir"), controller.GetKurirByID)
+	auth.GET("/kurir/:id", controller.GetKurirByID)
 	auth.PUT("/kurir/up/:id", middleware.RoleMiddleware("kurir"), controller.UpdateKurirByID)
 	auth.GET("/kurir/:id/orders/proses", controller.GetOrdersProses)
 	auth.GET("/kurir/:id/orders/selesai/today", controller.GetOrdersSelesaiToday)
@@ -70,7 +71,7 @@ func SetupRoutes(r *gin.Engine) {
 	auth.GET("/users", middleware.RoleMiddleware("admin"), controller.GetAllUsers)
 	auth.GET("/users/:id", middleware.RoleMiddleware("admin"), controller.GetUserByID)
 	auth.PUT("/users/:id", middleware.RoleMiddleware("admin"), controller.UpdateUser)
-	auth.DELETE("/users/:id", middleware.RoleMiddleware("admin"), controller.DeleteUser)
+	auth.DELETE("/users/:id", middleware.RoleMiddleware("admin"), controller.SoftDeleteUser)
 	auth.GET("/users/profile", middleware.RoleMiddleware("customer"), controller.GetUserProfile)
 
 }

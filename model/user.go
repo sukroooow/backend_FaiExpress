@@ -12,7 +12,7 @@ type User struct {
 	OrdersAsKurir    []Order `gorm:"foreignKey:KurirID" json:"orders_as_kurir,omitempty"`
 	Status           string  `json:"status"`     // online, offline
 	PlatNomor        *string `json:"plat_nomor"` // ⏳ "pending" atau ✅ "done"
-
+	StatusKerja      string  `gorm:"type:varchar(10);default:'aktif'" json:"status_kerja"`
 }
 
 // func (User) TableName() string {
