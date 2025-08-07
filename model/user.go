@@ -15,6 +15,6 @@ type User struct {
 	StatusKerja      string  `gorm:"type:varchar(10);default:'aktif'" json:"status_kerja"`
 }
 
-// func (User) TableName() string {
-// 	return "public.users"
-// }
+func (User) TableName() string {
+	return "public.users"
+}

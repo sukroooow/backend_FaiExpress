@@ -26,6 +26,6 @@ type Order struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-// func (Order) TableName() string {
-// 	return "public.orders"
-// }
+func (Order) TableName() string {
+	return "public.orders"
+}

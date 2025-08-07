@@ -15,3 +15,7 @@ type Message struct {
 	Sender User `gorm:"foreignKey:SenderID"` // 👈
 
 }
+
+func (Message) TableName() string {
+	return "public.messages"
+}
