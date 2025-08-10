@@ -92,6 +92,7 @@ func GetOrderByID(c *gin.Context) {
 		"user_id":        order.Customer.ID, // ✅ tambahkan ini
 		"payment_status": order.PaymentStatus,
 		"tagihan":        order.Nominal,
+		"MetodeBayar":    order.MetodeBayar,
 	})
 }
 
