@@ -36,6 +36,11 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	if user.StatusKerja != "aktif" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Akun anda tidak aktif"})
+		return
+	}
+
 	// Generate token dan kirim user info
 	token, err := utils.GenerateToken(user.ID, user.Role)
 	if err != nil {
