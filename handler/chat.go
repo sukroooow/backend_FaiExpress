@@ -89,8 +89,11 @@ func SendChatMessage(c *gin.Context) {
 			"time":    time.Now().Format(time.RFC3339),
 		},
 	}
-
-	jsonPayload, err := json.Marshal(payload)
+	reqbody := CentrifugoPublishPayload{
+		Method: "publish",
+		Params: payload,
+	}
+	jsonPayload, err := json.Marshal(reqbody)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to encode payload"})
 		return
