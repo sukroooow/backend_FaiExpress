@@ -33,8 +33,8 @@ type SendChatInput struct {
 	Content    string `json:"message" binding:"required"`
 }
 type CentrifugoPublishParams struct {
-	Channel string                 `json:"channel"`
-	Data    map[string]interface{} `json:"data"`
+	Channel string        `json:"channel"`
+	Data    model.Message `json:"data"`
 }
 
 // Struct untuk menerima body request Flutter
@@ -83,11 +83,7 @@ func SendChatMessage(c *gin.Context) {
 
 	payload := CentrifugoPublishParams{
 		Channel: channel,
-		Data: map[string]interface{}{
-			"sender":  msg.Sender,
-			"message": msg.Message,
-			"time":    time.Now().Format(time.RFC3339),
-		},
+		Data:    newMessage,
 	}
 	reqbody := CentrifugoPublishPayload{
 		Method: "publish",
