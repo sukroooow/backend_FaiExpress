@@ -3,12 +3,11 @@ package main
 import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/mubarok-ridho/misi-paket.backend/config"
 	"github.com/mubarok-ridho/misi-paket.backend/route"
 )
 
 func main() {
-	config.ConnectDB()
+	// config.ConnectDB()
 
 	r := gin.Default()
 
