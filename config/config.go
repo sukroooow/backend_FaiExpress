@@ -33,8 +33,12 @@ func ConnectDB() {
 
 	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	// if err != nil {
+	// 	log.Fatal("Gagal koneksi ke database:", err)
+	// }
 	if err != nil {
-		log.Fatal("Gagal koneksi ke database:", err)
+		log.Println("⚠️ Gagal koneksi ke database:", err)
+		return // jangan fatal, biarin server tetep hidup
 	}
 
 	log.Println("✅ Berhasil terkoneksi ke database PostgreSQL")
