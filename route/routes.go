@@ -19,6 +19,10 @@ func SetupRoutes(r *gin.Engine) {
 	r.GET("/chat/load/:order_id", handlers.GetMessagesByOrderID)
 	r.GET("/orders/:id/status", controller.CheckOrderKurirReady)
 
+	r.GET("/kaithheathcheck", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "OK"})
+	})
+
 	// ✅ Auth
 	r.POST("/register", controller.Register)
 	r.POST("/login", controller.Login)
